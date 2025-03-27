@@ -105,7 +105,218 @@ Al pulsar en los enlaces nos muestra el contenido de los archivos
 
 ![](files/lfi2.png)
 
+##Explotación de LFI
+---
 
+**Leer archivos sensibles**
+Prueba básica: Teniendo en cuenta que la página debe de estar en directorio /var/www/html podemos intentar ponerle la ruta de un archivo, tanto en ruta absoluta como relativa. Por ello si ponemos la ruta de /etc/passwd podemos intentar ver los datos de usuarios del sistema
+
+
+~~~
+http://localhost/lfi.php?file=../../../../etc/passwd
+~~~
+Si devuelve similar a:
+
+![](files/lfi3.png)
+ 
+La aplicación es vulnerable a LFI.
+
+**Ejecutar código PHP (PHP Wrappers)**
+---
+Si la aplicación permite incluir archivos .php, se podría ejecutar código malicioso.
+
+Ejemplo con php://filter para leer código fuente de archivos PHP: Vamos a intentar extraer el código del archivo index.html del servidor, aunque podríamos acceder a cualquiera:
+
+Para que funcione este ataque tienen que estar activada la función de PHP allow_url_include. 
+
+Si tenemos levantado el escenario en docker tenemos que acceder al contenedor del servidor web:
+
+~~~
+docker exec -it lamp-php83  /bin/bash
+~~~
+
+y editamos el archivo de configuración de php. Recordamos que en nuestro contendor está en una ruta diferente.
+
+~~~
+nano /usr/local/etc/php/php.ini
+~~~
+
+y ponermos la variable allow_url_include a on.
+
+~~~
+allow_url_include=on
+~~~
+
+Después reiniciamos el servicio.
+
+![](files/lfi5.png)
+
+Vamos a realizar el ataque, para ver si podemos ejecutar php en el servidor y así obtener el código del archivo index.html
+~~~
+http://localhost/lfi.php?file=php://filter/convert.base64-encode/resource=index.html
+~~~
+
+
+- file= → Se usa un parámetro vulnerable en lfi.php que permite incluir archivos arbitrarios en el servidor.php://filter/convert.base64-encode/resource=index.html:
+- php://filter → Es un wrapper especial de PHP que permite aplicar filtros de manipulación de datos.
+	- convert.base64-encode → Codifica el contenido del archivo en Base64 en lugar de mostrarlo directamente.
+	- resource=index.html → Especifica el archivo que se quiere leer, en este caso index.html.
+
+![](files/lfi4.png)
+
+**Decodificar la cadena en Base64 y mostrar el resultado:**
+
+Copiamos la cadena que hemos obtenido y realizamos la decodificación:
+
+~~~
+echo "BASE64_ENCODED_DATA" | base64 -d
+~~~
+![](files/lfi5.png)
+
+Es posible que podamos encontrar en este u otro archivo el comentario con la contraseña, etc....
+
+**Remote Code Execution (RCE) con Log Poisoning**
+Si la aplicación escribe entradas de usuario en logs, se podría inyectar código PHP malicioso en ellos y luego incluir el archivo de logs.
+
+Enviar payload en User-Agent (inyectar en logs de Apache). Ejecutamos en un terminal de comandos
+
+~~~
+curl -A "<?php system('whoami'); ?>" http://localhost
+~~~
+
+Hacemos un LFI para  Incluir el log para ejecutar código:
+
+![](files/lfi7.png)
+
+~~~
+http://localhost/lfi.php?file=/var/log/apache2/access.log
+~~~
+o si lo tenemos en la pila LAMP de docker en:
+~~~
+http://localhost/lfi.php?file=/var/log/apache2/other_vhosts_access.log
+~~~
+ Si se muestra el resultado de **whoami**, LFI ha escalado a la ejecución de comandos (RCE).
+
+### Mitigación de LFI
+---
+
+**Usar una Lista Blanca de Archivos Permitidos**
+---
+Una primera mitigación que podemos realizar es una lista blanca, de manera que sólo podamos incluir los archivos de una lista. En nuestro caso: file1.php y file2.php
+~~~
+<?php
+// Establecemos una lista de archivos que se pueden incluir
+$whitelist = ["home.php", "contact.php"];
+if (isset($_GET['file'])) {
+        $file = $_GET['file'];
+        if (!in_array($file, $whitelist)) {
+                die("Acceso denegado.");
+        }
+        echo file_get_contents($file);
+}
+
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ejemplo de Enlaces</title>
+</head>
+<body>
+    <h1>Elige un archivo</h1>
+    <ul>
+        <li><a href="?file=file1.php">Archivo 1</a></li>
+        <li><a href="?file=file2.php">Archivo 2</a></li>
+    </ul>
+</body>
+</html>
+~~~
+
+Si intentamos incluir cualquier otro archivo nos dá acceso denegado:
+ 
+![](files/lfi8.png)
+
+**Bloquear Secuencias de Directorios (../)**
+---
+En este caso la estrategia es tener un único o únicos directorios desde los que incluir los archivos. Sólo podrían estar en esa ubicación. En este caso le decimos que es en directorio donde se encuentra el archivo lfi.php
+~~~
+<?php
+// Establecemos el directorio permitido en el mismo directorio del script
+$baseDir = __DIR__ . DIRECTORY_SEPARATOR;
+
+if (isset($_GET['file'])) {
+    $file = $_GET['file'];
+
+    // Normalizamos la ruta para evitar ataques con '../'
+    $filePath = realpath($baseDir . $file);
+    // Verificamos si el archivo está dentro del directorio permitido
+    if ($filePath === false || strpos($filePath, $baseDir) !== 0) {
+        die("Acceso denegado.");
+    }
+
+    // Verificamos que el archivo realmente existe
+    if (!file_exists($filePath)) {
+        die("El archivo no existe.");
+    }
+    echo file_get_contents($file);
+
+}
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ejemplo de Enlaces</title>
+</head>
+<body>
+    <h1>Elige un archivo</h1>
+    <ul>
+        <li><a href="?file=file1.php">Archivo 1</a></li>
+        <li><a href="?file=file2.php">Archivo 2</a></li>
+    </ul>
+</body>
+</html>
+~~~
+
+**Restringir el Tipo de Archivo**
+---
+
+Si solo se permiten archivos .php, filtrar la extensión:
+
+<?php
+$file = $_GET['file'];
+if (!preg_match('/^[a-zA-Z0-9_-]+\.php$/', $file)) {
+die("Acceso denegado.");
+}
+include("pages/" . $file);
+?>
+
+Bloquea archivos con extensiones no deseadas.
+
+**Deshabilitar allow_url_include y allow_url_fopen en php.ini**
+---
+
+allow_url_include = Off
+allow_url_fopen = Off
+Evita ataques de Remote File Inclusion (RFI).
+
+**Usar realpath() para Evitar Path Traversal**
+
+~~~
+<?php
+$file = $_GET['file'];
+$baseDir = realpath("pages/");
+$realPath = realpath("pages/" . $file);
+
+if (strpos($realPath, $baseDir) !== 0) {
+die("Acceso denegado.");
+}
+include($realPath);
+?>
+~~~
+
+Garantiza que el archivo esté dentro de pages/.
 
 ![](files/lfi1.png)
 ![](files/lfi1.png)
