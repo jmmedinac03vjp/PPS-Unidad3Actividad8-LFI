@@ -141,7 +141,7 @@ y editamos el archivo de configuración de php. Recordamos que en nuestro conten
 nano /usr/local/etc/php/php.ini
 ~~~
 
-y ponermos la variable allow_url_include a on.
+y ponermos la variable allow_url_include a on. Aquí tienes el [php.ini](files/php.ini.lfi) para hacer las pruebas.
 
 ~~~
 allow_url_include=on
@@ -239,7 +239,109 @@ Si intentamos incluir cualquier otro archivo nos dá acceso denegado:
 
 **Bloquear Secuencias de Directorios (../)**
 ---
-En este caso la estrategia es tener un único o únicos directorios desde los que incluir los archivos. Sólo podrían estar en esa ubicación. En este caso le decimos que es en directorio donde se encuentra el archivo lfi.php
+Con *str_contains* verificamos si el nombre del archivo contiene ".." y denegaríamos el acceso. 
+~~~
+?php
+
+if (isset($_GET['file'])) {
+    $file = $_GET['file'];
+
+        // Verificar si el nombre del archivo contiene ".." (para prevenir LFI)
+        if (str_contains($file, '..')) {
+            die("Acceso denegado.");
+        }    // Normalizamos la ruta para evitar ataques con '../'
+        // mostramos contenido del archivo
+        echo file_get_contents($file);
+
+}
+?>
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ejemplo de Enlaces</title>
+</head>
+<body>
+    <h1>Elige un archivo</h1>
+    <ul>
+        <li><a href="?file=file1.php">Archivo 1</a></li>
+        <li><a href="?file=file2.php">Archivo 2</a></li>
+    </ul>
+</body>
+</html>
+~~~
+
+**Restringir el Tipo de Archivo**
+---
+
+Una posible mitigación es permitir sólo archivos con una determinada extensión.
+
+Por ejemplo si solo queremos permitir archivos .php, filtramos la extensión:
+
+~~~
+<?php
+if (isset($_GET['file'])) {
+        $file = $_GET['file'];
+        // Validar que el archivo tenga la extensión .php
+        if (pathinfo($file, PATHINFO_EXTENSION) !== 'php') {
+            die("Acceso denegado.");
+        }
+    echo file_get_contents($file);
+}
+
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ejemplo de Enlaces</title>
+</head>
+<body>
+    <h1>Elige un archivo</h1>
+    <ul>
+        <li><a href="?file=./files/file1.txt">Archivo 1</a></li>
+        <li><a href="?file=./files/file2.php">Archivo 2</a></li>
+    </ul>
+</body>
+</html>
+~~~
+Bloquea archivos con extensiones no deseadas.
+
+Copia el file1.php como file1.txt. Si estamos trabajando con la pila LAMP Docker:
+~~~
+cp www/file1.php www/file1.txt
+~~~
+Vemos como en este caso, nos dejará acceso al Archivo2.ph, pero no al Archivo1.txt
+
+**Deshabilitar allow_url_include y allow_url_fopen en php.ini**
+---
+~~~
+allow_url_include = Off
+allow_url_fopen = Off
+~~~
+
+![](files/lfi9.png)
+
+Aquí puedes encontrar el fichero de configuración [php.ini](files/php.ini.lfi2).
+
+Recuerda reiniciar el servicio para que se apliquen las configuraciones, por ejemplo reiniciando el contenedor si usas docker:
+
+~~~
+docker-compose restart webserver
+~~~
+
+
+> La directiva de configuración de PHP allow_url_include está habilitada. Al estar habilitada, permite la recuperación de datos desde ubicaciones remotas (sitio web o servidor FTP) para funciones como fopen y file_get_contents.
+
+> La directiva allow_url_fopen le permite el acceso por URL a ficheros mediante funciones como fopen, require e include. Muchos plugins de varios CMS (Wordpress, Prestashop, etc) requieren que allow_url_fopen esté activo en su hosting.
+
+En nuestro caso seguiría funcionando pero evita ataques de Remote File Inclusion (RFI). Eso sí, no podríamos utilizar funciones como fopen y file_get_contents.
+
+
+**Usar realpath() para Evitar Path Traversal  y asegurar que archivos están en el mismo directyorio**
+---
+De esta forma garantizamos que no haya una ruta trasnversal para llevarmos a una ruta diferente a la más directa
 ~~~
 <?php
 // Establecemos el directorio permitido en el mismo directorio del script
@@ -279,52 +381,86 @@ if (isset($_GET['file'])) {
 </html>
 ~~~
 
-**Restringir el Tipo de Archivo**
----
+- Asi verificamos de directorios están en el mismo directorio que lfi.php
 
-Si solo se permiten archivos .php, filtrar la extensión:
-
-<?php
-$file = $_GET['file'];
-if (!preg_match('/^[a-zA-Z0-9_-]+\.php$/', $file)) {
-die("Acceso denegado.");
-}
-include("pages/" . $file);
-?>
-
-Bloquea archivos con extensiones no deseadas.
-
-**Deshabilitar allow_url_include y allow_url_fopen en php.ini**
----
-
-allow_url_include = Off
-allow_url_fopen = Off
-Evita ataques de Remote File Inclusion (RFI).
-
-**Usar realpath() para Evitar Path Traversal**
-
-~~~
-<?php
-$file = $_GET['file'];
-$baseDir = realpath("pages/");
-$realPath = realpath("pages/" . $file);
-
-if (strpos($realPath, $baseDir) !== 0) {
-die("Acceso denegado.");
-}
-include($realPath);
-?>
-~~~
-
+- También comprobamos que el archivos existe.
 Garantiza que el archivo esté dentro de pages/.
 
-![](files/lfi1.png)
-![](files/lfi1.png)
-![](files/lfi1.png)
-![](files/lfi1.png)
-![](files/lfi1.png)
-![](files/lfi1.png)
+** Código seguro**
+---
+Aquí está el código securizado:
 
+~~~
+<?php
+// Definir el directorio seguro donde están los archivos permitidos
+// ejemplo $directorio_permitido = __DIR__ . '/archivos_permitidos/';
+$directorio_permitido = './';
+
+// Lista blanca de archivos permitidos
+$archivos_permitidos = [
+    'file1.php',
+    'file2.php'
+];
+
+// Verificar si se ha pasado un archivo por parámetro
+if (isset($_GET['file'])) {
+    $file = $_GET['file'];
+
+    // Validar que el archivo está en la lista blanca
+    if (!in_array($file, $archivos_permitidos, true)) {
+        die("Acceso denegado.");
+    }
+
+    // Obtener la ruta real del archivo
+    $ruta_real = realpath($directorio_permitido . $file);
+
+    // Asegurar que la ruta real está dentro del directorio permitido
+    if (!$ruta_real || !str_starts_with($ruta_real, realpath($directorio_permitido))) {
+        die("Acceso denegado.");
+    }
+
+    // Mostrar el contenido del archivo de forma segura
+    echo nl2br(htmlspecialchars(file_get_contents($ruta_real)));
+}
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ejemplo de Enlaces</title>
+</head>
+<body>
+    <h1>Elige un archivo</h1>
+    <ul>
+        <li><a href="?file=file1.php">Archivo 1</a></li>
+        <li><a href="?file=file2.php">Archivo 2</a></li>
+    </ul>
+</body>
+</html>
+~~~
+🔒 Medidas de seguridad implementadas
+
+- Lista blanca de archivos permitidos ($archivos_permitidos):
+
+	- Solo permite los archivos explícitamente definidos en la lista.
+
+	- Un atacante no puede solicitar otros archivos del servidor.
+
+- Usa realpath() y str_starts_with() para evitar rutas maliciosas:
+
+	- Evita ../ y rutas fuera del directorio permitido.
+
+- Escapa el contenido del archivo antes de mostrarlo (htmlspecialchars()):
+
+	- Evita ataques XSS si el archivo contiene código HTML.
+
+	- nl2br() mantiene los saltos de línea.
+
+
+🚀 Resultado
+✔ Solo permite file1.php y file2.php.
+✔ Bloquea cualquier intento de LFI o acceso no autorizado.
+✔ Evita XSS mostrando contenido de forma segura.
 ~~~
 
 ## ENTREGA
