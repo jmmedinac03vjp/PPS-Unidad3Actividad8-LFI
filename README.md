@@ -8,11 +8,10 @@ Tenemos como objetivo:
 >
 > - Implementar diferentes modificaciones del codigo para aplicar mitigaciones o soluciones.
 
-La inclusión local de archivos (también conocida como LFI) es el proceso de incluir archivos, que ya están presentes localmente en el servidor, a través de la explotación de procedimientos de inclusión vulnerables implementados en la aplicación. Esta vulnerabilidad ocurre, por ejemplo, cuando una página recibe, como entrada, la ruta al archivo que debe incluirse y esta entrada no se desinfecta correctamente, lo que permite inyectar caracteres de salto de directorio (como punto-punto-slash). Aunque la mayoría de los ejemplos apuntan a scripts PHP vulnerables, debemos tener en cuenta que también es común en otras tecnologías como JSP, ASP y otras.
-
 ## ¿Qué es Inclusión de archivos locales (LFI)?
 ---
 
+La inclusión local de archivos (también conocida como LFI) es el proceso de incluir archivos, que ya están presentes localmente en el servidor, a través de la explotación de procedimientos de inclusión vulnerables implementados en la aplicación. Esta vulnerabilidad ocurre, por ejemplo, cuando una página recibe, como entrada, la ruta al archivo que debe incluirse y esta entrada no se desinfecta correctamente, lo que permite inyectar caracteres de salto de directorio (como punto-punto-slash). Aunque la mayoría de los ejemplos apuntan a scripts PHP vulnerables, debemos tener en cuenta que también es común en otras tecnologías como JSP, ASP y otras.
 
 Esto puede conducir a algo como la salida del contenido del archivo, pero dependiendo de la gravedad, también puede conducir a:
 
@@ -24,7 +23,6 @@ Esto puede conducir a algo como la salida del contenido del archivo, pero depend
 
 - Divulgación de Información Sensible
 
-La inclusión local de archivos (también conocida como LFI) es el proceso de incluir archivos, que ya están presentes localmente en el servidor, a través de la explotación de procedimientos de inclusión vulnerables implementados en la aplicación. Esta vulnerabilidad ocurre, por ejemplo, cuando una página recibe, como entrada, la ruta al archivo que debe incluirse y esta entrada no se desinfecta correctamente, lo que permite inyectar caracteres de salto de directorio (como punto-punto-slash). Aunque la mayoría de los ejemplos apuntan a scripts PHP vulnerables, debemos tener en cuenta que también es común en otras tecnologías como JSP, ASP y otras.
 
 ## ACTIVIDADES A REALIZAR
 ---
@@ -106,7 +104,7 @@ Al pulsar en los enlaces nos muestra el contenido de los archivos
 
 ![](images/lfi2.png)
 
-##Explotación de LFI
+## Explotación de LFI
 ---
 **Leer archivos sensibles**
 
@@ -150,7 +148,6 @@ allow_url_include=on
 
 Después reiniciamos el servicio.
 
-![](images/lfi5.png)
 
 Vamos a realizar el ataque, para ver si podemos ejecutar php en el servidor y así obtener el código del archivo index.html
 
@@ -176,19 +173,20 @@ echo "BASE64_ENCODED_DATA" | base64 -d
 
 ![](images/lfi5.png)
 
-Es posible que podamos encontrar en este u otro archivo el comentario con la contraseña, etc....
+De esta forma hemos obtenido el contenido de un archivo que no debería de ser accesible. Es posible que podamos encontrar en este u otro archivo un comentario con la contraseña, el código funte, etc....
 
 **Remote Code Execution (RCE) con Log Poisoning**
 
-Si la aplicación escribe entradas de usuario en logs, se podría inyectar código PHP malicioso en ellos y luego incluir el archivo de logs.
+Si la aplicación escribe entradas de usuario en logs, se podría inyectar código PHP malicioso en ellos. Así podríamos realizar operaciones no permitidas.  Esa información de esta forma la podemos enviar a los logs del sistema, para despues tener acceso a dichos logs y así obtener información sensible..
 
 Enviar payload en User-Agent (inyectar en logs de Apache). Ejecutamos en un terminal de comandos
 
 ~~~
 curl -A "<?php system('whoami'); ?>" http://localhost
 ~~~
+Esto intenta ejecutar el código php para solicitar el usuario que está ejecutando el servidor de localhost. El resultado de la información "whoami" irá a los logs de apache2.
 
-Hacemos un LFI para  Incluir el log para ejecutar código:
+Hacemos un LFI para  Incluir el log, y así poder recuperar el resultado del comando ejecutado:
 
 ![](images/lfi7.png)
 
@@ -214,7 +212,7 @@ Una primera mitigación que podemos realizar es una lista blanca, de manera que 
 ~~~
 <?php
 // Establecemos una lista de archivos que se pueden incluir
-$whitelist = ["home.php", "contact.php"];
+$whitelist = ["file1.php", "file2.php"];
 if (isset($_GET['file'])) {
         $file = $_GET['file'];
         if (!in_array($file, $whitelist)) {
@@ -315,9 +313,9 @@ if (isset($_GET['file'])) {
 </html>
 ~~~
 
-Bloquea archivos con extensiones no deseadas.
+Bloquea archivos con extensiones no deseadas, o mejor dicho, sólo nos va a permitir incluir archivos con las extensiones especificadas.
 
-Copia el file1.php como file1.txt. Si estamos trabajando con la pila LAMP Docker:
+Para probar el funcionamiento, copia el file1.php como file1.txt. Si estamos trabajando con la pila LAMP Docker:
 
 ~~~
 cp www/file1.php www/file1.txt
@@ -348,10 +346,9 @@ docker-compose restart webserver
 
 En nuestro caso seguiría funcionando pero evita ataques de Remote File Inclusion (RFI). Eso sí, no podríamos utilizar funciones como fopen y file_get_contents.
 
+**Usar realpath() para Evitar Path Traversal  y asegurar que archivos están en el mismo directorio**
 
-**Usar realpath() para Evitar Path Traversal  y asegurar que archivos están en el mismo directyorio**
----
-De esta forma garantizamos que no haya una ruta trasnversal para llevarmos a una ruta diferente a la más directa
+De esta forma garantizamos que no haya una ruta trasnversal para llevarmos a una ruta diferente a donde están ubicados los directorios.
 
 ~~~
 <?php
@@ -394,10 +391,11 @@ if (isset($_GET['file'])) {
 
 - Asi verificamos de directorios están en el mismo directorio que lfi.php
 
-- También comprobamos que el archivos existe.
-Garantiza que el archivo esté dentro de pages/.
+- También comprobamos que el archivo existe.
 
-** Código seguro**
+- Garantiza que el archivo esté en el direcotorio indicado: $baseDir
+
+### **Código seguro**
 ---
 
 Aquí está el código securizado:
@@ -470,18 +468,20 @@ if (isset($_GET['file'])) {
 
 
 🚀 Resultado
+
 ✔ Solo permite file1.php y file2.php.
+
 ✔ Bloquea cualquier intento de LFI o acceso no autorizado.
+
 ✔ Evita XSS mostrando contenido de forma segura.
-~~~
 
 ## ENTREGA
 
->__Realiza las operaciones indicadas__
+> __Realiza las operaciones indicadas__
 
->__Crea un repositorio  con nombre PPS-Unidad3Actividad6-Tu-Nombre donde documentes la realización de ellos.__
+> __Crea un repositorio  con nombre PPS-Unidad3Actividad6-Tu-Nombre donde documentes la realización de ellos.__
 
 > No te olvides de documentarlo convenientemente con explicaciones, capturas de pantalla, etc.
 
->__Sube a la plataforma, tanto el repositorio comprimido como la dirección https a tu repositorio de Github.__
+> __Sube a la plataforma, tanto el repositorio comprimido como la dirección https a tu repositorio de Github.__
 
