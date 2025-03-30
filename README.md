@@ -108,7 +108,11 @@ Al pulsar en los enlaces nos muestra el contenido de los archivos
 ---
 **Leer archivos sensibles**
 
-Prueba básica: Teniendo en cuenta que la página debe de estar en directorio /var/www/html podemos intentar ponerle la ruta de un archivo, tanto en ruta absoluta como relativa. Por ello si ponemos la ruta de /etc/passwd podemos intentar ver los datos de usuarios del sistema
+Si nos damos cuenta al pulsar en enlace al archivo el navegador nos lleva a **http://localhost/lfi.php?file=file1.php**. Démonos cuenta de que podemos modificar manualmente el fichero a mostrar cambiando file1.php por cualquier otro contenido o ruta.
+
+Prueba básica: Para saber si una página es vulnerable a LFI y teniendo en cuenta que la página que mostramos debe de estar en directorio /var/www/html, podemos intentar ponerle la ruta de un archivo, tanto en ruta absoluta como relativa. 
+
+Si ponemos la ruta de /etc/passwd podemos intentar ver los datos de usuarios del sistema.
 
 ~~~
 http://localhost/lfi.php?file=../../../../etc/passwd
