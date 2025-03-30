@@ -8,10 +8,11 @@ Tenemos como objetivo:
 >
 > - Implementar diferentes modificaciones del codigo para aplicar mitigaciones o soluciones.
 
+La inclusión local de archivos (también conocida como LFI) es el proceso de incluir archivos, que ya están presentes localmente en el servidor, a través de la explotación de procedimientos de inclusión vulnerables implementados en la aplicación. Esta vulnerabilidad ocurre, por ejemplo, cuando una página recibe, como entrada, la ruta al archivo que debe incluirse y esta entrada no se desinfecta correctamente, lo que permite inyectar caracteres de salto de directorio (como punto-punto-slash). Aunque la mayoría de los ejemplos apuntan a scripts PHP vulnerables, debemos tener en cuenta que también es común en otras tecnologías como JSP, ASP y otras.
+
 ## ¿Qué es Inclusión de archivos locales (LFI)?
 ---
 
-La vulnerabilidad de Inclusión de archivos permite a un atacante incluir un archivo, generalmente explotando un mecanismo “dynamic file inclusion” implementado en la aplicación de destino. La vulnerabilidad se produce debido al uso de la entrada suministrada por el usuario sin la validación adecuada.
 
 Esto puede conducir a algo como la salida del contenido del archivo, pero dependiendo de la gravedad, también puede conducir a:
 
@@ -24,7 +25,7 @@ Esto puede conducir a algo como la salida del contenido del archivo, pero depend
 - Divulgación de Información Sensible
 
 La inclusión local de archivos (también conocida como LFI) es el proceso de incluir archivos, que ya están presentes localmente en el servidor, a través de la explotación de procedimientos de inclusión vulnerables implementados en la aplicación. Esta vulnerabilidad ocurre, por ejemplo, cuando una página recibe, como entrada, la ruta al archivo que debe incluirse y esta entrada no se desinfecta correctamente, lo que permite inyectar caracteres de salto de directorio (como punto-punto-slash). Aunque la mayoría de los ejemplos apuntan a scripts PHP vulnerables, debemos tener en cuenta que también es común en otras tecnologías como JSP, ASP y otras.
--
+
 ## ACTIVIDADES A REALIZAR
 ---
 
@@ -32,7 +33,7 @@ La inclusión local de archivos (también conocida como LFI) es el proceso de in
 
 > Lee el siguiente [documento sobre Explotación y Mitigación de ataques de Remote Code Execution](./files/ExplotacionYMitigacionLFI.pdf)
  
-> También y como marco de referencia, tienes [ la sección de correspondiente de ataque LFI Local File Inclusion **Proyecto Web Security Testing Guide** (WSTG) del proyecto **OWASP**.](https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11.1-Testing_for_Local_File_Inclusion)
+> También y como marco de referencia, tienes la sección de correspondiente de ataque LFI Local File Inclusion **Proyecto Web Security Testing Guide** (WSTG) del proyecto **OWASP**: <https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11.1-Testing_for_Local_File_Inclusion>
 
 
 En esta ocasión vamos a recrear los archivos que tenemos para el entrenamiento de esta vulnerabilidad en la [máquina DVWA](https://github.com/digininja/DVWA)
@@ -98,24 +99,26 @@ $file[ 'body' ] .= "
 ?>
 ~~~
 
-![](files/lfi1.png)
-
 Al pulsar en los enlaces nos muestra el contenido de los archivos
 
-![](files/lfi2.png)
+![](images/lfi1.png)
+
+
+![](images/lfi2.png)
 
 ##Explotación de LFI
 ---
 **Leer archivos sensibles**
-Prueba básica: Teniendo en cuenta que la página debe de estar en directorio /var/www/html podemos intentar ponerle la ruta de un archivo, tanto en ruta absoluta como relativa. Por ello si ponemos la ruta de /etc/passwd podemos intentar ver los datos de usuarios del sistema
 
+Prueba básica: Teniendo en cuenta que la página debe de estar en directorio /var/www/html podemos intentar ponerle la ruta de un archivo, tanto en ruta absoluta como relativa. Por ello si ponemos la ruta de /etc/passwd podemos intentar ver los datos de usuarios del sistema
 
 ~~~
 http://localhost/lfi.php?file=../../../../etc/passwd
 ~~~
+
 Si devuelve similar a:
 
-![](files/lfi3.png)
+![](images/lfi3.png)
  
 La aplicación es vulnerable a LFI.
 
@@ -147,9 +150,10 @@ allow_url_include=on
 
 Después reiniciamos el servicio.
 
-![](files/lfi5.png)
+![](images/lfi5.png)
 
 Vamos a realizar el ataque, para ver si podemos ejecutar php en el servidor y así obtener el código del archivo index.html
+
 ~~~
 http://localhost/lfi.php?file=php://filter/convert.base64-encode/resource=index.html
 ~~~
@@ -160,7 +164,7 @@ http://localhost/lfi.php?file=php://filter/convert.base64-encode/resource=index.
 	- convert.base64-encode → Codifica el contenido del archivo en Base64 en lugar de mostrarlo directamente.
 	- resource=index.html → Especifica el archivo que se quiere leer, en este caso index.html.
 
-![](files/lfi4.png)
+![](images/lfi4.png)
 
 **Decodificar la cadena en Base64 y mostrar el resultado:**
 
@@ -169,11 +173,13 @@ Copiamos la cadena que hemos obtenido y realizamos la decodificación:
 ~~~
 echo "BASE64_ENCODED_DATA" | base64 -d
 ~~~
-![](files/lfi5.png)
+
+![](images/lfi5.png)
 
 Es posible que podamos encontrar en este u otro archivo el comentario con la contraseña, etc....
 
 **Remote Code Execution (RCE) con Log Poisoning**
+
 Si la aplicación escribe entradas de usuario en logs, se podría inyectar código PHP malicioso en ellos y luego incluir el archivo de logs.
 
 Enviar payload en User-Agent (inyectar en logs de Apache). Ejecutamos en un terminal de comandos
@@ -184,16 +190,19 @@ curl -A "<?php system('whoami'); ?>" http://localhost
 
 Hacemos un LFI para  Incluir el log para ejecutar código:
 
-![](files/lfi7.png)
+![](images/lfi7.png)
 
 ~~~
 http://localhost/lfi.php?file=/var/log/apache2/access.log
 ~~~
+
 o si lo tenemos en la pila LAMP de docker en:
+
 ~~~
 http://localhost/lfi.php?file=/var/log/apache2/other_vhosts_access.log
 ~~~
- Si se muestra el resultado de **whoami**, LFI ha escalado a la ejecución de comandos (RCE).
+
+Si se muestra el resultado de **whoami**, LFI ha escalado a la ejecución de comandos (RCE).
 
 ### Mitigación de LFI
 ---
@@ -201,6 +210,7 @@ http://localhost/lfi.php?file=/var/log/apache2/other_vhosts_access.log
 **Usar una Lista Blanca de Archivos Permitidos**
 ---
 Una primera mitigación que podemos realizar es una lista blanca, de manera que sólo podamos incluir los archivos de una lista. En nuestro caso: file1.php y file2.php
+
 ~~~
 <?php
 // Establecemos una lista de archivos que se pueden incluir
@@ -233,11 +243,12 @@ if (isset($_GET['file'])) {
 
 Si intentamos incluir cualquier otro archivo nos dá acceso denegado:
  
-![](files/lfi8.png)
+![](images/lfi8.png)
 
 **Bloquear Secuencias de Directorios (../)**
 ---
 Con *str_contains* verificamos si el nombre del archivo contiene ".." y denegaríamos el acceso. 
+
 ~~~
 ?php
 
@@ -270,7 +281,6 @@ if (isset($_GET['file'])) {
 ~~~
 
 **Restringir el Tipo de Archivo**
----
 
 Una posible mitigación es permitir sólo archivos con una determinada extensión.
 
@@ -304,22 +314,25 @@ if (isset($_GET['file'])) {
 </body>
 </html>
 ~~~
+
 Bloquea archivos con extensiones no deseadas.
 
 Copia el file1.php como file1.txt. Si estamos trabajando con la pila LAMP Docker:
+
 ~~~
 cp www/file1.php www/file1.txt
 ~~~
+
 Vemos como en este caso, nos dejará acceso al Archivo2.ph, pero no al Archivo1.txt
 
 **Deshabilitar allow_url_include y allow_url_fopen en php.ini**
----
+
 ~~~
 allow_url_include = Off
 allow_url_fopen = Off
 ~~~
 
-![](files/lfi9.png)
+![](images/lfi9.png)
 
 Aquí puedes encontrar el fichero de configuración [php.ini](files/php.ini.lfi2).
 
@@ -328,7 +341,6 @@ Recuerda reiniciar el servicio para que se apliquen las configuraciones, por eje
 ~~~
 docker-compose restart webserver
 ~~~
-
 
 > La directiva de configuración de PHP allow_url_include está habilitada. Al estar habilitada, permite la recuperación de datos desde ubicaciones remotas (sitio web o servidor FTP) para funciones como fopen y file_get_contents.
 
@@ -340,6 +352,7 @@ En nuestro caso seguiría funcionando pero evita ataques de Remote File Inclusio
 **Usar realpath() para Evitar Path Traversal  y asegurar que archivos están en el mismo directyorio**
 ---
 De esta forma garantizamos que no haya una ruta trasnversal para llevarmos a una ruta diferente a la más directa
+
 ~~~
 <?php
 // Establecemos el directorio permitido en el mismo directorio del script
@@ -386,6 +399,7 @@ Garantiza que el archivo esté dentro de pages/.
 
 ** Código seguro**
 ---
+
 Aquí está el código securizado:
 
 ~~~
