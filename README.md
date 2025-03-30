@@ -2,9 +2,9 @@
 Explotación y Mitigación de ().
 Tenemos como objetivo:
 
-> - Ver cómo se pueden hacer ataques .
+> - Ver cómo se pueden hacer ataques de Local File Inclusion.
 >
-> - Analizar el código de la aplicación que permite ataques de .
+> - Analizar el código de la aplicación que permite ataques de Local File Inclusion.
 >
 > - Implementar diferentes modificaciones del codigo para aplicar mitigaciones o soluciones.
 
@@ -30,9 +30,9 @@ La inclusión local de archivos (también conocida como LFI) es el proceso de in
 
 > Lee detenidamente la sección de Local File  de la página de PortWigger <https://portswigger.net/web-security/file-path-traversal>
 
-> Lee el siguiente [documento sobre Explotación y Mitigación de ataques de Remote Code Execution](./files/ExplotacionYMitigacionLFI.pdf>
+> Lee el siguiente [documento sobre Explotación y Mitigación de ataques de Remote Code Execution](./files/ExplotacionYMitigacionLFI.pdf)
  
-> También y como marco de referencia, tienes [ la sección de correspondiente de ataque LFI Local File Inclusion **Proyecto Web Security Testing Guide** (WSTG) del proyecto **OWASP**.]<https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11.1-Testing_for_Local_File_Inclusion> 
+> También y como marco de referencia, tienes [ la sección de correspondiente de ataque LFI Local File Inclusion **Proyecto Web Security Testing Guide** (WSTG) del proyecto **OWASP**.](https://owasp.org/www-project-web-security-testing-guide/stable/4-Web_Application_Security_Testing/07-Input_Validation_Testing/11.1-Testing_for_Local_File_Inclusion)
 
 
 En esta ocasión vamos a recrear los archivos que tenemos para el entrenamiento de esta vulnerabilidad en la [máquina DVWA](https://github.com/digininja/DVWA)
@@ -66,38 +66,37 @@ file1.php
 ~~~
 <?php
 
-$page[ 'body' ] .= "
+$file[ 'body' ] .= "
 <div class=\"body_padded\">
-	<h1>Vulnerability: File Inclusion</h1>
-	<div class=\"vulnerable_code_area\">
-		<h3>File 1</h3>
-		<hr />
-		Hello <em>" . tio . "</em><br />
-		Your IP address is: <em>{$_SERVER[ 'REMOTE_ADDR' ]}</em><br /><br />
-	</div>
-</div>\n";
+        <h1>Vulnerability: File Inclusion</h1>
+        <div class=\"vulnerable_code_area\">
+                <h3>File 1</h3>
+                Hola  tio, esto es el archivo 1
+        </div>
+</div>
 
 ?>
 
 ~~~
-Esta página nos muestra nuestra dirección ip.
+Esta página simplemente nos muestra un mensaja, al igual que el siguiente:
 
 El archivo file2.php tiene el siguiente contenido: 
 
 ~~~
 <?php
 
-$page[ 'body' ] .= "
+$file[ 'body' ] .= "
 <div class=\"body_padded\">
-	<h1>Vulnerability: File Inclusion</h1>
-	<div class=\"vulnerable_code_area\">
-		<h3>File 2</h3>
-		<hr />
-		\"<em>I needed a password eight characters long so I picked Snow White and the Seven Dwarves.</em>\" ~ Nick Helm"<br /><br />
+        <h1>Vulnerability: File Inclusion</h1>
+        <div class=\"vulnerable_code_area\">
+                <h3>File 2</h3>
+                <hr />
+                \"<em>I needed a password eight characters long so I picked Snow White and the Seven Dw>
 
-</div>;
+</div>\<<n";
 
 ?>
+~~~
 
 ![](files/lfi1.png)
 
@@ -107,7 +106,6 @@ Al pulsar en los enlaces nos muestra el contenido de los archivos
 
 ##Explotación de LFI
 ---
-
 **Leer archivos sensibles**
 Prueba básica: Teniendo en cuenta que la página debe de estar en directorio /var/www/html podemos intentar ponerle la ruta de un archivo, tanto en ruta absoluta como relativa. Por ello si ponemos la ruta de /etc/passwd podemos intentar ver los datos de usuarios del sistema
 
