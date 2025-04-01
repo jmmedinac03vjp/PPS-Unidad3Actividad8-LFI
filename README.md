@@ -1,5 +1,5 @@
-# PPS-Unidad3Actividad7-RCE
-Explotación y Mitigación de ().
+# PPS-Unidad3Actividad8-LFI
+Explotación y Mitigación de ataque de Inclusión de Ficheros locales (LFI).
 Tenemos como objetivo:
 
 > - Ver cómo se pueden hacer ataques de Local File Inclusion.
@@ -344,9 +344,11 @@ Recuerda reiniciar el servicio para que se apliquen las configuraciones, por eje
 docker-compose restart webserver
 ~~~
 
-> La directiva de configuración de PHP allow_url_include está habilitada. Al estar habilitada, permite la recuperación de datos desde ubicaciones remotas (sitio web o servidor FTP) para funciones como fopen y file_get_contents.
+¿Qué hacen estas configuraciones?
 
-> La directiva allow_url_fopen le permite el acceso por URL a ficheros mediante funciones como fopen, require e include. Muchos plugins de varios CMS (Wordpress, Prestashop, etc) requieren que allow_url_fopen esté activo en su hosting.
+1. La directiva de configuración de PHP allow_url_include está habilitada. Al estar habilitada, permite la recuperación de datos desde ubicaciones remotas (sitio web o servidor FTP) para funciones como fopen y file_get_contents.
+
+2. La directiva allow_url_fopen le permite el acceso por URL a ficheros mediante funciones como fopen, require e include. Muchos plugins de varios CMS (Wordpress, Prestashop, etc) requieren que allow_url_fopen esté activo en su hosting.
 
 En nuestro caso seguiría funcionando pero evita ataques de Remote File Inclusion (RFI). Eso sí, no podríamos utilizar funciones como fopen y file_get_contents.
 
@@ -398,6 +400,15 @@ if (isset($_GET['file'])) {
 - También comprobamos que el archivo existe.
 
 - Garantiza que el archivo esté en el direcotorio indicado: $baseDir
+
+
+Para finalizar, volvemos a restaurar el fichero de configuracióbn a su estado original.
+
+Accedemos al servidor web y resturamos php.ini
+
+~~~
+cp /usr/local/etc/php/php.ini.original /usr/local/etc/php/php.ini         
+~~~
 
 ### **Código seguro**
 ---
@@ -483,7 +494,7 @@ if (isset($_GET['file'])) {
 
 > __Realiza las operaciones indicadas__
 
-> __Crea un repositorio  con nombre PPS-Unidad3Actividad6-Tu-Nombre donde documentes la realización de ellos.__
+> __Crea un repositorio  con nombre PPS-Unidad3Actividad8-Tu-Nombre donde documentes la realización de ellos.__
 
 > No te olvides de documentarlo convenientemente con explicaciones, capturas de pantalla, etc.
 
