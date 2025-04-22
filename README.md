@@ -44,16 +44,27 @@ Tenemos el archivo vulnerable lfi.php con el siguiente contenido.
 ~~~
 <?php
 
-$page[ 'body' ] .= "
-<div class=\"body_padded\">
-	<h1>Vulnerability: File Inclusion</h1>
+if (isset($_GET['file'])) {
+    $file = $_GET['file'];
+    echo file_get_contents($file);
+}
 
-	{$WarningHtml}
+?>
 
-	<div class=\"vulnerable_code_area\">
-		[<em><a href=\"?page=file1.php\">file1.php</a></em>] - [<em><a href=\"?page=file2.php\">file2.php</a></em>]
-	</div>
-</div>\n";
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ejemplo de Enlaces</title>
+</head>
+<body>
+    <h1>Elige un archivo</h1>
+    <ul>
+        <li><a href="?file=file1.php">Archivo 1</a></li>
+        <li><a href="?file=file2.php">Archivo 2</a></li>
+    </ul>
+</body>
+</html>
 
 ?>
 
@@ -77,7 +88,7 @@ $file[ 'body' ] .= "
 ?>
 
 ~~~
-Esta página simplemente nos muestra un mensaja, al igual que el siguiente:
+Esta página simplemente nos muestra un mensaje, al igual que el siguiente:
 
 El archivo file2.php tiene el siguiente contenido: 
 
