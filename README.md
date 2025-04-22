@@ -164,7 +164,7 @@ allow_url_include=on
 Después reiniciamos el servicio.
 
 
-Vamos a realizar el ataque, para ver si podemos ejecutar php en el servidor y así obtener el código del archivo index.html
+Vamos a realizar el ataque, para ver si podemos ejecutar php en el servidor y así obtener el código del archivo index.html o cualquier otro del servidor. (Si no tienes index.html en tu servidor, crea uno o pon la ruta de otro archivo en la siguiente dirección). 
 
 ~~~
 http://localhost/lfi.php?file=php://filter/convert.base64-encode/resource=index.html
